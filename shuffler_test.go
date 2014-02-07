@@ -1,6 +1,7 @@
 package shuffler
 
 import (
+	"fmt"
 	"math/rand"
 	"play/anchor"
 	"regexp"
@@ -8,10 +9,110 @@ import (
 	"testing"
 )
 
+// Shuffle based on specification string.
+func shuffleSpec(in string, shuf *shuffler) (string, error) {
+
+	s := strings.Map(func(r rune) rune {
+		if r == ' ' {
+			return -1
+		}
+		return r
+	}, in)
+
+	choices := make([]*choice, 0, len(s))
+	var top *choice
+
+	for _, r := range s {
+		switch r {
+		case '.', '<', '>':
+			if top == nil {
+				return "", fmt.Errorf("incorrect input string: %s", s)
+			}
+		}
+
+		switch r {
+		case '.':
+			top.anchorType = anchor.Position
+		case '>':
+			top.anchorType = anchor.ToNext
+		case '<':
+			top.anchorType = anchor.ToPrevious
+		default:
+			top = &choice{string(r), anchor.None}
+			choices = append(choices, top)
+		}
+	}
+
+	if shuf == nil {
+		shuf = New()
+	}
+	
+	for j, choice := range choices {
+		shuf.Add(j, choice.anchorType)
+	}
+	shuffled := shuf.Shuffle(rand.Int63())
+
+	tmp := make([]string, len(shuffled))
+	for j, k := range shuffled {
+		tmp[j] = choices[k].text
+	}
+
+	return strings.Join(tmp, ""), nil
+}
+
+
 type choice struct {
 	text       string
 	anchorType anchor.Type
 }
+
+type data struct {
+	name string
+	in   string //input
+	re   string //output regex
+}
+
+var anchored = []data{
+	{"empty", "", ""},
+	{"one choice, not anchored", "A", "A"},
+	{"one choice, anchored", "A.", "A"},
+	{"two choices, neither anchored", "AB", "AB|BA"},
+	{"two choices, last anchored", "AB.", "AB"},
+	{"two choices, first anchored", "A.B", "AB"},
+	{"two choices, both anchored", "A.B.", "AB"},
+	{"three choices, middle anchored", "AB.C", "ABC|CBA"},
+	{"three choices, none anchored", "ABC", "ABC|BAC|BCA|CBA|CAB|ACB"},
+	{"three choices, first anchored", "A.BC", "A.."},
+	{"three choices, middle anchore", "AB.C", ".B."},
+	{"three choices, last anchored", "ABC.", "..C"},
+	{"Five choices, last anchored", "ABDCE.", "[^E]{4}E"},
+	{"hold CD", "ABC.D.E", "[^CD]*CD[^CD]*"},
+	{"Dangling First", "A<B", "AB|BA"},
+	{"Dangling Last", "AB>", "AB|BA"},
+	{"Mutual anchor", "A>B<", "AB"},
+}
+
+func TestAnchored(t *testing.T) {
+	for i, v := range anchored {
+
+		out, err := shuffleSpec(v.in, New())
+		if err != nil {
+			t.Fatalf("%d: Error with input %s: %s", i, v.in, err)
+		}
+
+		t.Logf("%s -> %s\n", v.in, out)
+
+		matched, err := regexp.MatchString(v.re, out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !matched {
+			t.Errorf("NO MATCH. Want [%s] to match re [%s]\n", out, v.re)
+		}
+	}
+}
+
+
 
 var Cases = [][]choice{
 	// no choices
@@ -81,90 +182,11 @@ func TestShuffle(t *testing.T) {
 	}
 }
 
-type data struct {
-	name string
-	in   string //input
-	re   string //output regex
-}
+var spec = strings.Repeat("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 10)
+var N = 1000
 
-var anchored = []data{
-	{"empty", "", ""},
-	{"one choice, not anchored", "A", "A"},
-	{"one choice, anchored", "A.", "A"},
-	{"two choices, neither anchored", "AB", "AB|BA"},
-	{"two choices, last anchored", "AB.", "AB"},
-	{"two choices, first anchored", "A.B", "AB"},
-	{"two choices, both anchored", "A.B.", "AB"},
-	{"three choices, middle anchored", "AB.C", "ABC|CBA"},	
-	{"three choices, none anchored", "ABC", "ABC|BAC|BCA|CBA|CAB|ACB"},
-	{"three choices, first anchored", "A.BC", "A.."},
-	{"three choices, middle anchore", "AB.C", ".B."},
-	{"three choices, last anchored", "ABC.", "..C"},
-	{"Five choices, last anchored", "ABDCE.", "[^E]{4}E"},	
-	{"hold CD", "ABC.D.E", "[^CD]*CD[^CD]*"},
-	{"Dangling First", "A<B", "AB|BA"},
-	{"Dangling Last", "AB>", "AB|BA"},
-	{"Mutual anchor", "A>B<", "AB"},
-}
-
-func TestAnchored(t *testing.T) {
-	for i, v := range anchored {
-
-		s := strings.Map(func(r rune) rune {
-			if r == ' ' {
-				return -1
-			}
-			return r
-		}, v.in)
-
-		choices := make([]*choice, 0, len(s))
-		var top *choice
-
-		for _, r := range s {
-			switch r {
-			case '.', '<', '>':
-				if top == nil {
-					t.Fatalf("%d: incorrect input spec: %s %s", i, v.name, s)
-				}
-			}
-
-			switch r {
-			case '.':
-				top.anchorType = anchor.Position
-			case '>':
-				top.anchorType = anchor.ToNext
-			case '<':
-				top.anchorType = anchor.ToPrevious
-			default:
-				top = &choice{string(r), anchor.None}
-				choices = append(choices, top)
-			}
-		}
-
-		shuf := New()
-		for j, choice := range choices {
-			shuf.Add(j, choice.anchorType)
-		}
-		shuffled := shuf.Shuffle(rand.Int63())
-
-		tmp := make([]string, len(shuffled))
-		for j, k := range shuffled {
-			tmp[j] = choices[k].text
-		}
-		out := strings.Join(tmp, "")
-
-		t.Logf("%s -> %s\n", v.in, out)
-		
-		if want, got := len(choices), len(out); want != got {
-			t.Errorf("%d: wrong Count: expected output length=%d, got %d for %s", i, want, got, v.in)
-		}
-		
-		matched, err := regexp.MatchString(v.re, out)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !matched {
-			t.Errorf("NO MATCH. Want [%s] to match re [%s]\n", out, v.re)
-		}
+func BenchmarkNew(b *testing.B) {
+	for i := 0; i < N; i++ {
+		shuffleSpec(spec, New())
 	}
 }
