@@ -49,7 +49,7 @@ func New() *shuffler {
 	}
 }
 
-// Add adds a new items to be shuffled.
+// Add appends a new items to be shuffled.
 // anchorType indicates how the item is anchored.
 func (s *shuffler) Add(slot int, anchorType anchor.Type) {
 	s.items = append(s.items, slot)
