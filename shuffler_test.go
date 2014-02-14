@@ -3,67 +3,14 @@ package shuffler
 import (
 	"fmt"
 	"math/rand"
-	"play/anchor"
 	"regexp"
 	"strings"
 	"testing"
 )
 
-// Shuffle based on specification string.
-func shuffleSpec(in string, shuf *shuffler) (string, error) {
-
-	s := strings.Map(func(r rune) rune {
-		if r == ' ' {
-			return -1
-		}
-		return r
-	}, in)
-
-	choices := make([]*choice, 0, len(s))
-	var top *choice
-
-	for _, r := range s {
-		switch r {
-		case '.', '<', '>':
-			if top == nil {
-				return "", fmt.Errorf("incorrect input string: %s", s)
-			}
-		}
-
-		switch r {
-		case '.':
-			top.anchorType = anchor.Position
-		case '>':
-			top.anchorType = anchor.ToNext
-		case '<':
-			top.anchorType = anchor.ToPrevious
-		default:
-			top = &choice{string(r), anchor.None}
-			choices = append(choices, top)
-		}
-	}
-
-	if shuf == nil {
-		shuf = New()
-	}
-	
-	for j, choice := range choices {
-		shuf.Add(j, choice.anchorType)
-	}
-	shuffled := shuf.Shuffle(rand.Int63())
-
-	tmp := make([]string, len(shuffled))
-	for j, k := range shuffled {
-		tmp[j] = choices[k].text
-	}
-
-	return strings.Join(tmp, ""), nil
-}
-
-
 type choice struct {
-	text       string
-	anchorType anchor.Type
+	text   string
+	anchor Anchor
 }
 
 type data struct {
@@ -72,7 +19,7 @@ type data struct {
 	re   string //output regex
 }
 
-var anchored = []data{
+var specTests = []data{
 	{"empty", "", ""},
 	{"one choice, not anchored", "A", "A"},
 	{"one choice, anchored", "A.", "A"},
@@ -92,8 +39,62 @@ var anchored = []data{
 	{"Mutual anchor", "A>B<", "AB"},
 }
 
+// Shuffle based on specification string.
+func shuffleSpec(in string, shuf *shuffler) (string, error) {
+
+	// remove spaces. They are for humans.
+	s := strings.Map(func(r rune) rune {
+		if r == ' ' {
+			return -1
+		}
+		return r
+	}, in)
+
+	choices := make([]*choice, 0, len(s))
+	var top *choice
+
+	for _, r := range s {
+
+		switch r {
+		case '.', '<', '>':
+			if top == nil {
+				return "", fmt.Errorf("incorrect input string: %s", s)
+			}
+		}
+
+		switch r {
+		case '.':
+			top.anchor = Position
+		case '>':
+			top.anchor = ToNext
+		case '<':
+			top.anchor = ToPrevious
+		default:
+			top = &choice{string(r), None}
+			choices = append(choices, top)
+		}
+	}
+
+	if shuf == nil {
+		shuf = New()
+	}
+
+	for j, choice := range choices {
+		shuf.Add(j, choice.anchor)
+	}
+
+	shuffled := shuf.Shuffle(rand.Int63())
+
+	tmp := make([]string, len(shuffled))
+	for j, k := range shuffled {
+		tmp[j] = choices[k].text
+	}
+
+	return strings.Join(tmp, ""), nil
+}
+
 func TestAnchored(t *testing.T) {
-	for i, v := range anchored {
+	for i, v := range specTests {
 
 		out, err := shuffleSpec(v.in, New())
 		if err != nil {
@@ -112,52 +113,50 @@ func TestAnchored(t *testing.T) {
 	}
 }
 
-
-
-var Cases = [][]choice{
+var shuffleTests = [][]choice{
 	// no choices
 	{},
 
 	// one choice, not anchored
-	{{"blue", anchor.None}},
+	{{"blue", None}},
 
 	// one choice, anchored
-	{{"banana", anchor.Position}},
+	{{"banana", Position}},
 
 	// two choices, neither anchored
-	{{"male", anchor.None}, {"female", anchor.None}},
+	{{"male", None}, {"female", None}},
 
 	// two choices, last anchored
-	{{"male", anchor.None}, {"female", anchor.Position}},
+	{{"male", None}, {"female", Position}},
 
 	// two choices, first anchored
-	{{"male", anchor.Position}, {"female", anchor.None}},
+	{{"male", Position}, {"female", None}},
 
 	// two choices, both anchored
-	{{"male", anchor.Position}, {"female", anchor.Position}},
+	{{"male", Position}, {"female", Position}},
 
 	// three choices, middle one anchored
-	{{"coke", anchor.None}, {"water", anchor.Position}, {"tea", anchor.None}},
+	{{"coke", None}, {"water", Position}, {"tea", None}},
 
 	// four choices, none anchored
-	{{"internet", anchor.None}, {"television", anchor.None}, {"radio", anchor.None}, {"newspapers", anchor.None}},
+	{{"internet", None}, {"television", None}, {"radio", None}, {"newspapers", None}},
 
 	// five choices, last one anchored
-	{{"mazda", anchor.None}, {"toyota", anchor.None}, {"miata", anchor.None}, {"ford", anchor.None}, {"none of the above", anchor.Position}},
+	{{"mazda", None}, {"toyota", None}, {"miata", None}, {"ford", None}, {"none of the above", Position}},
 }
 
 func TestShuffle(t *testing.T) {
 	seed := rand.Int63()
 
-	for k, list := range Cases {
+	for k, list := range shuffleTests {
 		shuf := New()
 		items := make([]int, len(list))
 		anchored := make([]int, 0)
 		for i, choice := range list {
-			if choice.anchorType == anchor.Position {
+			if choice.anchor == Position {
 				anchored = append(anchored, i)
 			}
-			shuf.Add(i, choice.anchorType)
+			shuf.Add(i, choice.anchor)
 			items[i] = i
 
 		}
@@ -172,16 +171,48 @@ func TestShuffle(t *testing.T) {
 
 		t.Log("\nInput\n")
 		for i, choice := range list {
-			t.Logf("%d: %s %s\n", i, choice.text, choice.anchorType)
+			t.Logf("%d: %s %s\n", i, choice.text, choice.anchor)
 		}
 		t.Log("\nOutput\n")
 		for _, j := range out {
 			choice := list[j]
-			t.Logf("%d: %s %s\n", j, choice.text, choice.anchorType)
+			t.Logf("%d: %s %s\n", j, choice.text, choice.anchor)
 		}
 	}
 }
 
+// Ensure that shuffler is not confusing indices with items.
+// by shuffling list of items that are all larger than largest index.
+func TestIndexItem(t *testing.T) {
+
+	const MAX = 100
+	cache := make(map[int]bool)
+	shuf := New()
+	for i := 0; i < MAX; i++ {
+		value := int(rand.Int31()) + MAX // all numbers must be greater than size of array
+		cache[value] = true
+		shuf.Add(value, None)
+	}
+
+	out := shuf.Shuffle(rand.Int63())
+
+	if len(cache) != len(out) {
+		t.Errorf("Shuffle returned %d items, want %d", len(out), len(cache))
+	}
+
+	for _, j := range out {
+		if !cache[j] {
+			if j < MAX {
+				t.Errorf("Shuffle returned an index, not an item: %d", j)
+			} else {
+				t.Errorf("Shuffle returned unknown value: %d", j)
+			}
+		}
+	}
+}
+
+// This was used to compare current constructor with a pre-allocating one.
+// No difference was found so the new one was removed.
 var spec = strings.Repeat("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", 10)
 var N = 1000
 
