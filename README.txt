@@ -1,11 +1,12 @@
 # What
 
-Package shuffler shuffles items.
+Package shuffler shuffles items using the standard Go math/rand.Perm shuffler, which uses
+the Fisher-Yates algorithm.
 
 # Why
 
 Shuffled items can be anchored by position or relationship to other items.
-This is very useful for market researchers doing surveys but may be useful to others.
+This is particularly useful for market researchers doing surveys but may be useful to others.
 
 # How
 

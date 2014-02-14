@@ -1,15 +1,16 @@
 <A name="toc1-0" title="What" />
 # What
 
-Package shuffler shuffles items.
+Package shuffler shuffles items using the standard Go math/rand.Perm shuffler, which uses
+the Fisher-Yates algorithm.
 
-<A name="toc1-5" title="Why" />
+<A name="toc1-6" title="Why" />
 # Why
 
 Shuffled items can be anchored by position or relationship to other items.
-This is very useful for market researchers doing surveys but may be useful to others.
+This is particularly useful for market researchers doing surveys but may be useful to others.
 
-<A name="toc1-11" title="How" />
+<A name="toc1-12" title="How" />
 # How
 
 Here is a complete example, also found in the example directory:
@@ -63,13 +64,13 @@ Here is a complete example, also found in the example directory:
     	}
     }
 
-<A name="toc1-18" title="When" />
+<A name="toc1-19" title="When" />
 # When
 
 Though I have not seen other implementations of shufflers with anchoring, I imagine they've been around for a while.
 I have written several implementations over the years in various languages.
 
-<A name="toc1-24" title="Who" />
+<A name="toc1-25" title="Who" />
 # Who
 
 Shuffler is written by Gyepi Sam <self-github@gyepi.com>
