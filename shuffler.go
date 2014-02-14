@@ -1,35 +1,33 @@
 /*
-Package shuffler shuffles arrays of integers.
+Package shuffler shuffles arrays of integers with anchoring.
 
 Array entries can be free or anchored.
 The former type is shuffled and the latter type is not.
-An entry can be anchored by position and it retains the same position after shuffling.
-An entry could also be anchored relative its previous or next entry, in which case, it
-retains the same relative position to its anchor, which can be shuffled.
+An entry anchored by position retains the same position after shuffling.
+An entry anchored relative its previous or next entry retains the same relative position
+to the anchor, which can be shuffled.
+It is possible to create multiple chains of anchors.
 
 Terminology
-"A > B" describes a list of two items where A is anchored to its successor, B
+"A > B" describes a list of two items where A is anchored to its successor, B.
 "A B <" describes the inverse, where B is anchored to its predecessor, A.
 "A B . C" describes a list where B is anchored by position.
 
 
 Edge Cases:
 
-In "A > B <"  A and B are mutually anchored. This will be converted into "A > B"
+In "A > B <"  A and B are mutually anchored. This will be converted into "A > B".
 In "A < B C"  and "A B C >" The endpoints are anchored to non-existent neighbors. The anchors are removed.
 
 Chains of references are handled correctly.
 */
-
 package shuffler
 
 import (
 	"math/rand"
-	"play/anchor"
 )
 
-// A shuffler shuffles integers (generally representing positions)
-// while maintaining anchored positions.
+// A shuffler shuffles integers (generally representing positions) while maintaining anchored positions.
 type shuffler struct {
 	items    []int
 	position map[int]bool
@@ -50,18 +48,19 @@ func New() *shuffler {
 }
 
 // Add appends a new items to be shuffled.
-// anchorType indicates how the item is anchored.
-func (s *shuffler) Add(slot int, anchorType anchor.Type) {
+// The anchor argument specifies how the item is anchored.
+func (s *shuffler) Add(slot int, anchor Anchor) {
+	index := len(s.items)
 	s.items = append(s.items, slot)
-	switch anchorType {
-	case anchor.Position:
-		s.position[slot] = true
-	case anchor.ToPrevious:
-		s.after[slot-1] = slot
-		s.skip[slot] = true
-	case anchor.ToNext:
-		s.before[slot+1] = slot
-		s.skip[slot] = true
+	switch anchor {
+	case Position:
+		s.position[index] = true
+	case ToPrevious:
+		s.after[index-1] = index
+		s.skip[index] = true
+	case ToNext:
+		s.before[index+1] = index
+		s.skip[index] = true
 	}
 }
 
@@ -71,14 +70,14 @@ func (s *shuffler) Add(slot int, anchorType anchor.Type) {
 // A > B < becomes A > B
 func (s *shuffler) resolve() {
 
-	if slot, ok := s.after[-1]; ok {
+	if index, ok := s.after[-1]; ok {
 		delete(s.after, -1)
-		delete(s.skip, slot)
+		delete(s.skip, index)
 	}
 
-	if slot, ok := s.before[len(s.items)]; ok {
+	if index, ok := s.before[len(s.items)]; ok {
 		delete(s.before, len(s.items))
-		delete(s.skip, slot)
+		delete(s.skip, index)
 	}
 
 	for from, to := range s.after {
@@ -89,8 +88,8 @@ func (s *shuffler) resolve() {
 	}
 }
 
-// Shuffle shuffles and returns the list of items added with Add, using seed
-// to initialize the random number generator.
+// Shuffle shuffles and returns the list of items added with Add,
+// using seed to initialize the random number generator.
 func (s *shuffler) Shuffle(seed int64) []int {
 	l := len(s.items)
 	r := rand.New(rand.NewSource(seed))
@@ -109,7 +108,7 @@ func (s *shuffler) Shuffle(seed int64) []int {
 
 		// position anchored items stay in place.
 		if s.position[j] {
-			out[j] = j
+			out[j] = s.items[j]
 			continue
 		}
 
@@ -121,18 +120,18 @@ func (s *shuffler) Shuffle(seed int64) []int {
 		// insert "ToNext" anchored items before item.
 		// follow chains of references
 		for v, ok := s.before[j]; ok; v, ok = s.before[v] {
-			out[k] = v
+			out[k] = s.items[v]
 			k++
 		}
 
 		// place the item
-		out[k] = j
+		out[k] = s.items[j]
 		k++
 
 		// insert "ToPrevious" anchored items after item.
 		// follow chains of references
 		for v, ok := s.after[j]; ok; v, ok = s.after[v] {
-			out[k] = v
+			out[k] = s.items[v]
 			k++
 		}
 	}
