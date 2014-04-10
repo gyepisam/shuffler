@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/gyepisam/shuffler"
-
-	"math/rand"
 )
 
 func main() {
@@ -34,7 +33,11 @@ func main() {
 		shuf.Add(i, shuffle.anchor)
 	}
 
-	indices := shuf.Shuffle(rand.Int63())
+	seed, err := shuffler.Seed()
+	if err != nil {
+		log.Fatal(err)
+	}
+	indices := shuf.Shuffle(seed)
 
 	fmt.Println("Sorted list of shuffles:")
 	for i, shuffle := range shuffles {

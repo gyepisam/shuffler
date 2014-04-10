@@ -24,6 +24,9 @@ Chains of references are handled correctly.
 package shuffler
 
 import (
+	crand "crypto/rand"
+	"math"
+	"math/big"
 	"math/rand"
 )
 
@@ -166,4 +169,13 @@ func shuffle(seed int64, items []int, anchored []int) []int {
 	}
 
 	return out
+}
+
+// Seed, a convenience function, produces a 64bit int value read from crypto/rand.Reader.
+func Seed() (int64, error) {
+	val, err := crand.Int(crand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		return 0, err
+	}
+	return val.Int64(), nil
 }

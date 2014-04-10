@@ -83,7 +83,11 @@ func shuffleSpec(in string, shuf *shuffler) (string, error) {
 		shuf.Add(j, choice.anchor)
 	}
 
-	shuffled := shuf.Shuffle(rand.Int63())
+	seed, err := Seed()
+	if err != nil {
+		return "", err
+	}
+	shuffled := shuf.Shuffle(seed)
 
 	tmp := make([]string, len(shuffled))
 	for j, k := range shuffled {
@@ -146,7 +150,10 @@ var shuffleTests = [][]choice{
 }
 
 func TestShuffle(t *testing.T) {
-	seed := rand.Int63()
+	seed, err := Seed()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for k, list := range shuffleTests {
 		shuf := New()
